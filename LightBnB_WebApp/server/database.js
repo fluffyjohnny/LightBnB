@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 const properties = require('./json/properties.json');
 const users = require('./json/users.json');
 const { Pool } = require('pg');
@@ -59,7 +60,7 @@ const addUser =  function(user) {
   return pool
     .query(`INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *;`, [user.name, user.email, user.password])
     .then(() => {
-      console.log('new user added');
+      console.log(`new user successfully added: ${user.name}`);
     })
     .catch((err) => console.log(err.message));
 };
@@ -73,7 +74,15 @@ exports.addUser = addUser;
  * @return {Promise<[{}]>} A promise to the reservations.
  */
 const getAllReservations = function(guest_id, limit = 10) {
-  return getAllProperties(null, 2);
+  return pool
+    .query(`SELECT * FROM reservations WHERE guest_id = $1 LIMIT $2`, [guest_id, limit])
+    .then((result) => {
+      if (!result) {
+        return null;
+      }
+      return result.rows[0];
+    })
+    .catch((err) => console.log(err.message));
 };
 exports.getAllReservations = getAllReservations;
 
