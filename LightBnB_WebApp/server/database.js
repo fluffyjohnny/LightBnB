@@ -18,13 +18,17 @@ const pool = new Pool({
  * @param {String} email The email of the user.
  * @return {Promise<{}>} A promise to the user.
  */
+
+const query = (sql, arr) => {
+  return pool.query(sql, arr);
+};
+
 const getUserWithEmail = function(email) {
 
-  return pool
-    .query(`SELECT * 
+  return query(`SELECT * 
     FROM users 
     WHERE email = $1`,
-    [email])
+  [email])
     .then((result) => {
       if (!result) {
         return null;
@@ -41,8 +45,7 @@ exports.getUserWithEmail = getUserWithEmail;
  * @return {Promise<{}>} A promise to the user.
  */
 const getUserWithId = function(id) {
-  return pool
-    .query(`SELECT * FROM users WHERE id = $1`, [id])
+  return query(`SELECT * FROM users WHERE id = $1`, [id])
     .then((result) => {
       if (!result) {
         return null;
@@ -60,12 +63,11 @@ exports.getUserWithId = getUserWithId;
  * @return {Promise<{}>} A promise to the user.
  */
 const addUser =  function(user) {
-  return pool
-    .query(`
+  return query(`
       INSERT INTO users (name, email, password) 
       VALUES ($1, $2, $3) 
       RETURNING *;`,
-    [user.name, user.email, user.password])
+  [user.name, user.email, user.password])
     .then(() => {
       console.log(`new user successfully added: ${user.name}`);
     })
@@ -81,8 +83,7 @@ exports.addUser = addUser;
  * @return {Promise<[{}]>} A promise to the reservations.
  */
 const getAllReservations = function(guest_id, limit = 10) {
-  return pool
-    .query(`
+  return query(`
       SELECT properties.*, reservations.*, AVG(rating) as average_rating
       FROM reservations 
       JOIN properties ON reservations.property_id = properties.id 
@@ -172,8 +173,7 @@ const getAllProperties = (options, limit = 30) => {
   LIMIT $${queryParams.length};
   `;
 
-  return pool
-    .query(queryString, queryParams)
+  return query(queryString, queryParams)
     .then((result) => result.rows)
     .catch((err) => console.log(err.message));
 };
@@ -222,8 +222,7 @@ const addProperty = function(property) {
   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) 
   RETURNING *;`;
 
-  return pool
-    .query(queryString, queryParams)
+  return query(queryString, queryParams)
     .then(() => {
       console.log(`new property successfully added: ${property.title}`);
     })

@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
+const database = require('./database');
 
-module.exports = function(router, database) {
+module.exports = function(router) {
 
   // Create a new user
   router.post('/', (req, res) => {
