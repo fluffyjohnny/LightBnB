@@ -21,7 +21,10 @@ const pool = new Pool({
 const getUserWithEmail = function(email) {
 
   return pool
-    .query(`SELECT * FROM users WHERE email = $1`, [email])
+    .query(`SELECT * 
+    FROM users 
+    WHERE email = $1`,
+    [email])
     .then((result) => {
       if (!result) {
         return null;
@@ -58,7 +61,11 @@ exports.getUserWithId = getUserWithId;
  */
 const addUser =  function(user) {
   return pool
-    .query(`INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *;`, [user.name, user.email, user.password])
+    .query(`
+      INSERT INTO users (name, email, password) 
+      VALUES ($1, $2, $3) 
+      RETURNING *;`,
+    [user.name, user.email, user.password])
     .then(() => {
       console.log(`new user successfully added: ${user.name}`);
     })
@@ -75,12 +82,19 @@ exports.addUser = addUser;
  */
 const getAllReservations = function(guest_id, limit = 10) {
   return pool
-    .query(`SELECT * FROM reservations WHERE guest_id = $1 LIMIT $2`, [guest_id, limit])
+    .query(`
+      SELECT properties.*, reservations.*, AVG(rating) as average_rating
+      FROM reservations 
+      JOIN properties ON reservations.property_id = properties.id 
+      JOIN property_reviews ON property_reviews.property_id = properties.id 
+      WHERE reservations.guest_id = $1 
+      GROUP BY properties.id, reservations.id
+      LIMIT $2`, [guest_id, limit])
     .then((result) => {
       if (!result) {
         return null;
       }
-      return result.rows[0];
+      return result.rows;
     })
     .catch((err) => console.log(err.message));
 };
@@ -94,9 +108,77 @@ exports.getAllReservations = getAllReservations;
  * @param {*} limit The number of results to return.
  * @return {Promise<[{}]>}  A promise to the properties.
  */
-const getAllProperties = (options, limit = 10) => {
+const getAllProperties = (options, limit = 30) => {
+
+  const queryParams = [];
+  let queryString = `
+  SELECT properties.*, avg(property_reviews.rating) as average_rating
+  FROM properties
+  JOIN property_reviews 
+  ON properties.id = property_id
+  `;
+
+  if (options.owner_id) {
+    queryParams.push(`${options.owner_id}`);
+    if (queryString.includes('WHERE')) {
+      queryString += `AND owner_id = $${queryParams.length} `;
+    } else {
+      queryString += `WHERE owner_id = $${queryParams.length} `;
+    }
+  }
+
+  if (options.city) {
+    queryParams.push(`%${options.city}%`);
+    if (queryString.includes('WHERE')) {
+      queryString += `AND city LIKE $${queryParams.length} `;
+    } else {
+      queryString += `WHERE city LIKE $${queryParams.length} `;
+    }
+  }
+
+  if (options.minimum_price_per_night && options.maximum_price_per_night) {
+    queryParams.push(`${options.minimum_price_per_night}`, `${options.maximum_price_per_night}`);
+    if (queryString.includes('WHERE')) {
+      queryString += `AND cost_per_night > ($${queryParams.length - 1} * 100) 
+                      AND cost_per_night < ($${queryParams.length} * 100) `;
+    } else {
+      queryString += `WHERE cost_per_night > ($${queryParams.length - 1} * 100) 
+                      AND cost_per_night < ($${queryParams.length} * 100) `;
+    }
+  }
+
+  if (options.minimum_price_per_night) {
+    queryParams.push(`${options.minimum_price_per_night}`);
+    if (queryString.includes('WHERE')) {
+      queryString += `AND cost_per_night > ($${queryParams.length} * 100) `;
+    } else {
+      queryString += `WHERE cost_per_night > ($${queryParams.length} * 100) `;
+    }
+  }
+
+  if (options.maximum_price_per_night) {
+    queryParams.push(`${options.maximum_price_per_night}`);
+    if (queryString.includes('WHERE')) {
+      queryString += `AND cost_per_night < ($${queryParams.length} * 100) `;
+    } else {
+      queryString += `WHERE cost_per_night < ($${queryParams.length} * 100) `;
+    }
+  }
+
+  
+
+  queryParams.push(limit);
+  queryString += `
+  GROUP BY properties.id
+  ORDER BY cost_per_night
+  LIMIT $${queryParams.length};
+  `;
+
+  console.log('options: ', options);
+  console.log(queryString);
+
   return pool
-    .query(`SELECT * FROM properties LIMIT $1`, [limit])
+    .query(queryString, queryParams)
     .then((result) => result.rows)
     .catch((err) => console.log(err.message));
 };
